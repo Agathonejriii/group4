@@ -10,11 +10,9 @@ from .views import (
     GPARecordViewSet,
 )
 
-# Create DRF router and register viewsets
 router = DefaultRouter()
 router.register(r'gpa-records', GPARecordViewSet, basename='gpa-records')
 
-# Regular path-based URLs
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
@@ -24,5 +22,5 @@ urlpatterns = [
     path('all-users/', AllUsersListView.as_view(), name='all-users'),
 ]
 
-# Include router URLs at the end
+# Include router URLs
 urlpatterns += router.urls

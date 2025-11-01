@@ -6,7 +6,6 @@ from django.urls import path, include
 from django.http import HttpResponse
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-# Simple homepage - NO REDIRECTS
 def home(request):
     return HttpResponse("""
     <!DOCTYPE html>
@@ -29,22 +28,16 @@ def home(request):
             <li><a href="/admin/">Admin Panel</a></li>
             <li><a href="/api/">API</a></li>
             <li><a href="/api/token/">Get JWT Token</a></li>
-            <li><a href="/api/accounts/">Accounts API</a></li>
-            <li><a href="/api/students/">Students API</a></li>
         </ul>
     </body>
     </html>
     """, content_type="text/html")
 
 urlpatterns = [
-    path('', home, name='home'),  # Direct response, NO redirect
+    path('', home, name='home'),
     path('admin/', admin.site.urls),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/accounts/', include('accounts.urls')),
-    path('api/', include('students.urls')),
+    path('api/students/', include('students.urls')),  # Changed from just 'api/'
 ]
-
-# NO CATCH-ALL PATTERNS!
-# NO TemplateView AS_VIEW!
-# NO REDIRECTS!
