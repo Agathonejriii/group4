@@ -23,7 +23,24 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-fallback-key-for-dev-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.onrender.com').split(',')
+# In settings.py - Fix ALLOWED_HOSTS
+
+# Get Render URL dynamically
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS = [RENDER_EXTERNAL_HOSTNAME, 'localhost', '127.0.0.1']
+else:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
+# Or use this simpler version:
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1', 
+    '.onrender.com',  # Allows all Render subdomains
+]
+
+# Make sure DEBUG is False in production
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 
 # Application definition
@@ -60,9 +77,11 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            BASE_DIR / 'staticfiles',
+            BASE_DIR / 'templates',      # Primary templates directory
+            BASE_DIR / 'frontend/dist',  # React/Vue built files
+            BASE_DIR / 'staticfiles',    # Collected static files
         ],
-        'APP_DIRS': True,
+        'APP_DIRS': True,  # This allows Django to look for templates in installed apps
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
