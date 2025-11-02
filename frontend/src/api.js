@@ -1,1 +1,1 @@
-// This file has been consolidated into config/api.js
+// This file has been consolidated into config/api
