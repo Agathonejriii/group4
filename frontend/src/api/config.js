@@ -3,15 +3,19 @@
 
 // Get the base API URL based on environment
 const getBaseURL = () => {
-  if (import.meta.env.PROD) {
-    // For Render or any deployed environment
-    return `${window.location.origin}`;
+  // Check if we're in production (deployed on Render)
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    // Use the same origin as the frontend
+    return window.location.origin;
   }
+  
   // For local development
   return 'http://127.0.0.1:8000';
 };
 
 export const API_BASE_URL = getBaseURL();
+
+console.log('🌐 API Base URL:', API_BASE_URL); // Debug log
 
 // API endpoints
 export const API_ENDPOINTS = {
