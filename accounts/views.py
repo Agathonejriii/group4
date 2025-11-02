@@ -10,7 +10,8 @@ from rest_framework import generics, permissions, viewsets
 from .models import GPARecord
 from .serializers import GPARecordSerializer
 from .models import CustomUser
-from rest_framework import viewsets, permissions
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 
 User = get_user_model()
@@ -37,28 +38,14 @@ class AllUsersListView(APIView):
         
         return Response(data)
 
-class RegisterView(APIView):
-    permission_classes = [AllowAny]
-    
-    def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-            
-            return Response({
-                "message": "User created successfully",
-                "username": user.username,
-                "role": user.role,
-                "refresh": str(refresh),
-                "access": str(refresh.access_token),
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+# Add this decorator to LoginView and RegisterView
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    
+    def options(self, request, *args, **kwargs):
+        """Handle preflight CORS request"""
+        return Response(status=status.HTTP_200_OK)
     
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -77,6 +64,31 @@ class LoginView(APIView):
                 "access": str(refresh.access_token),
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+    
+    def options(self, request, *args, **kwargs):
+        """Handle preflight CORS request"""
+        return Response(status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                "message": "User created successfully",
+                "username": user.username,
+                "role": user.role,
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
@@ -159,3 +171,5 @@ class GPARecordViewSet(viewsets.ModelViewSet):
         if student_id:
             queryset = queryset.filter(student__id=student_id)
         return queryset
+    
+

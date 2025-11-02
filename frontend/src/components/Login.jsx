@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
+import { loginUser } from "../api/config";
 
 function Login() {
   const [username, setUsername] = useState("");
@@ -15,51 +16,30 @@ function Login() {
     setError("");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/accounts/login/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await response.json();
-      
-      // Debug: Check response
-      console.log("Login response:", data);
-
-      if (!response.ok) {
-        setError(
-          data.detail || 
-          data.non_field_errors?.[0] || 
-          "Invalid username or password"
-        );
-      } else {
-        // Save JWT tokens
-        localStorage.setItem("accessToken", data.access);
-        localStorage.setItem("refreshToken", data.refresh);
-        
-        // Save user info including role
-        localStorage.setItem("user", JSON.stringify({
-          username: data.username,
-          email: data.email,
-          role: data.role
-        }));
-        
-        console.log("Login successful! Stored tokens and user data.");
-        
-        // Navigate to dashboard
-        navigate("/dashboard");
-      }
+      const response = await loginUser(username, password);
+      // Save user info in localStorage
+      const userInfo = {
+        username: response.username,
+        email: response.email,
+        role: response.role,
+      };
+      localStorage.setItem("user", JSON.stringify(userInfo));
+      console.log("✅ Login successful!", userInfo);
+      navigate("/dashboard"); // Redirect after login
     } catch (err) {
-      console.error("Login error:", err);
-      setError("Something went wrong. Please try again.");
+      console.error("❌ Login error:", err);
+      // Handle different error types
+      if (err.message.includes('NetworkError') || err.message.includes('fetch')) {
+        setError("Cannot connect to server. Please ensure the backend is running.");
+      } else {
+        setError(err.message || "Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }; // ✅ Added missing closing brace and semicolon
 
-  const handleRegisterClick = () => {
-    navigate("/register");
-  };
+  const handleRegisterClick = () => navigate("/register");
 
   return (
     <div className="login-page">
@@ -76,11 +56,11 @@ function Login() {
       <div className="login-container">
         <h3>Login</h3>
         <p>Please enter your university credentials to continue.</p>
-
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Username</label>
+            <label htmlFor="username">Username</label>
             <input
+              id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -88,10 +68,10 @@ function Login() {
               required
             />
           </div>
-
           <div className="form-group">
-            <label>Password</label>
+            <label htmlFor="password">Password</label>
             <input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -99,14 +79,11 @@ function Login() {
               required
             />
           </div>
-
           {error && <p className="text-danger">{error}</p>}
-
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
-
         <div className="login-footer">
           <p className="footer-links">
             Forgot your password? <a href="#">Reset here</a> |{" "}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { studentAPI } from "../../config/api"
+import { studentAPI, fetchCurrentUser } from "../../api/config"; // UPDATED: Changed from ../../config/api
 import { Download, FileText, TrendingUp, Clock, CheckCircle, AlertCircle, RefreshCw, Info } from "lucide-react";
 
 
@@ -14,8 +14,19 @@ function StudentReportsPage() {
 
   // Load user data
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('userData') || 'null');
-    setUserData(user);
+    const loadUserData = async () => {
+      try {
+        // First try to get from API
+        const user = await fetchCurrentUser();
+        setUserData(user);
+        localStorage.setItem('userData', JSON.stringify(user));
+      } catch (error) {
+        // Fallback to localStorage
+        const user = JSON.parse(localStorage.getItem('userData') || 'null');
+        setUserData(user);
+      }
+    };
+    loadUserData();
   }, []);
 
   // Fetch user's existing reports
@@ -25,11 +36,8 @@ function StudentReportsPage() {
       setError(null);
       const reportsData = await studentAPI.getReports();
       setReports(reportsData);
+      setUsingFallback(false); // Successfully got real data
       
-      // Check if we're using fallback data
-      if (reportsData.length > 0 && reportsData[0].id === 1) {
-        setUsingFallback(true);
-      }
     } catch (error) {
       console.error('Error fetching reports:', error);
       setError('Failed to load reports: ' + error.message);
@@ -113,7 +121,7 @@ function StudentReportsPage() {
             };
             
             setReports(prev => [newReport, ...prev]);
-            setUsingFallback(true);
+            setGeneratingReport(false);
           },
           // Error callback
           (error) => {
@@ -124,6 +132,7 @@ function StudentReportsPage() {
               message: error,
               progress: '0%'
             });
+            setGeneratingReport(false);
           },
           3000 // Poll every 3 seconds
         );
@@ -136,7 +145,6 @@ function StudentReportsPage() {
       // For development, simulate success even if API fails
       console.log('⚠️ Using development mode - simulating report generation');
       simulateReportProgress(Date.now(), reportType);
-    } finally {
       setGeneratingReport(false);
     }
   };
@@ -380,43 +388,43 @@ function StudentReportsPage() {
                       </tr>
                     </thead>
                     <tbody>
-  {reports.map((report) => (
-    <tr key={report.id}>
-      <td>
-        <strong>{report.title}</strong>
-      </td>
-      <td>
-        <span className="badge bg-primary text-capitalize">
-          {report.report_type}
-        </span>
-      </td>
-      <td>
-        <span className={`badge bg-${getStatusColor(report.status)} d-flex align-items-center`} style={{width: 'fit-content'}}>
-          {getStatusIcon(report.status)}
-          <span className="ms-1 text-capitalize">{report.status}</span>
-        </span>
-      </td>
-      <td>
-        {report.created_at ? new Date(report.created_at).toLocaleDateString() : 'N/A'}
-      </td>
-      <td>
-        {report.status === 'completed' ? (
-          <button
-            className="btn btn-sm btn-success d-flex align-items-center"
-            onClick={() => downloadReport(report.id)}
-          >
-            <Download size={14} className="me-1" />
-            Download
-          </button>
-        ) : (
-          <span className="text-muted small">
-            {report.status === 'processing' ? 'Generating...' : 'Not available'}
-          </span>
-        )}
-      </td>
-    </tr>
-  ))}
-</tbody>
+                      {reports.map((report) => (
+                        <tr key={report.id}>
+                          <td>
+                            <strong>{report.title}</strong>
+                          </td>
+                          <td>
+                            <span className="badge bg-primary text-capitalize">
+                              {report.report_type}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge bg-${getStatusColor(report.status)} d-flex align-items-center`} style={{width: 'fit-content'}}>
+                              {getStatusIcon(report.status)}
+                              <span className="ms-1 text-capitalize">{report.status}</span>
+                            </span>
+                          </td>
+                          <td>
+                            {report.created_at ? new Date(report.created_at).toLocaleDateString() : 'N/A'}
+                          </td>
+                          <td>
+                            {report.status === 'completed' ? (
+                              <button
+                                className="btn btn-sm btn-success d-flex align-items-center"
+                                onClick={() => downloadReport(report.id)}
+                              >
+                                <Download size={14} className="me-1" />
+                                Download
+                              </button>
+                            ) : (
+                              <span className="text-muted small">
+                                {report.status === 'processing' ? 'Generating...' : 'Not available'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
                   </table>
                 </div>
               )}
