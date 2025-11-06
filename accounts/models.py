@@ -2,8 +2,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth import get_user_model
 
-
-
 class CustomUser(AbstractUser):
     ROLE_CHOICES = [
         ('student', 'Student'),
@@ -29,3 +27,29 @@ class GPARecord(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.semester}"
+
+class Report(models.Model):
+    REPORT_TYPES = [
+        ('performance', 'Performance Report'),
+        ('course', 'Course Report'),
+        ('system', 'System Report'),
+        ('user', 'User Activity Report'),
+    ]
+    
+    title = models.CharField(max_length=200)
+    type = models.CharField(max_length=20, choices=REPORT_TYPES)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    
+    def __str__(self):
+        return self.title
+    
+class Course(models.Model):
+    name = models.CharField(max_length=200)
+    code = models.CharField(max_length=20, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.name

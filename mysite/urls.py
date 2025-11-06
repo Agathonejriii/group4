@@ -9,13 +9,23 @@ from django.conf.urls.static import static
 from django.views.static import serve
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-# API endpoints - These MUST come FIRST
+# Import the views from your accounts app
+from accounts.views import DashboardStatsView, UserListView, CourseListView, ReportListView
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/accounts/', include('accounts.urls')),
     path('api/students/', include('students.urls')),
+    
+    # Dashboard API endpoints
+    path('api/accounts/dashboard-stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
+    path('api/accounts/users/', UserListView.as_view(), name='user-list'),
+    path('api/accounts/courses/', CourseListView.as_view(), name='course-list'),
+    path('api/accounts/reports/', ReportListView.as_view(), name='report-list'),
+    
+    path('api/accounts/', include('reports.urls')),
 ]
 
 # Explicitly serve assets from Vite build

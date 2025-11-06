@@ -81,6 +81,18 @@ function AdminReportsPage() {
       type: "Assessment",
     },
   ]);
+  
+  const [showStorageModal, setShowStorageModal] = useState(false);
+  const [storageOption, setStorageOption] = useState("download"); // download, cloud, email
+  const [emailForm, setEmailForm] = useState({
+    recipient: "",
+    subject: "Student Performance Report",
+    message: "Please find attached the student performance report.",
+  });
+  const [cloudProvider, setCloudProvider] = useState("gdrive"); // gdrive, dropbox, onedrive
+  const [uploadingToCloud, setUploadingToCloud] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [storageStatus, setStorageStatus] = useState("");
 
   // Get token with better validation
   const getToken = () => {
@@ -486,6 +498,208 @@ function AdminReportsPage() {
       alert("Deleted locally (API unavailable)");
     }
   };
+
+  // ========== STORAGE & SHARING FUNCTIONS ==========
+  const downloadStudentReport = () => {
+    const csvContent = generateStudentCSV(filteredStudents);
+    downloadCSV(csvContent, `student_performance_report_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const downloadPDF = () => {
+    const content = generateStudentReportText(filteredStudents);
+    downloadTextFile(content, `student_performance_report_${new Date().toISOString().split('T')[0]}.txt`);
+  };
+
+  // Cloud Storage Functions
+  const uploadToCloud = async (reportData, provider) => {
+    setUploadingToCloud(true);
+    setStorageStatus("☁️ Uploading to cloud storage...");
+
+    try {
+      const token = getToken();
+      const fileName = `student_performance_report_${new Date().toISOString().split('T')[0]}.json`;
+      
+      // Prepare report data
+      const reportContent = JSON.stringify(reportData || {
+        students: filteredStudents,
+        generatedAt: new Date().toISOString(),
+        summary: {
+          totalStudents: filteredStudents.length,
+          averageGPA: calculateAverageGPA(),
+          semester: selectedSemester,
+        }
+      }, null, 2);
+
+      // Send to backend cloud storage endpoint
+      const response = await fetchWithAuth("http://127.0.0.1:8000/api/accounts/cloud-upload/", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: provider,
+          fileName: fileName,
+          fileContent: reportContent,
+          fileType: "application/json",
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStorageStatus(`✅ Successfully uploaded to ${provider.toUpperCase()}!`);
+        alert(`Report uploaded to ${provider.toUpperCase()} successfully!\n${data.url || ''}`);
+        setTimeout(() => setStorageStatus(""), 3000);
+        return true;
+      } else {
+        throw new Error("Cloud upload failed");
+      }
+    } catch (error) {
+      console.error("Cloud upload error:", error);
+      setStorageStatus("❌ Cloud upload failed. Using local storage...");
+      
+      // Fallback: Store locally in browser (simulated cloud storage)
+      const localCloudKey = `cloud_report_${Date.now()}`;
+      try {
+        const reportContent = JSON.stringify(reportData || {
+          students: filteredStudents,
+          generatedAt: new Date().toISOString(),
+          summary: {
+            totalStudents: filteredStudents.length,
+            averageGPA: calculateAverageGPA(),
+            semester: selectedSemester,
+          }
+        });
+        
+        // Store in memory or trigger download as backup
+        const blob = new Blob([reportContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cloud_backup_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        
+        alert(`Cloud service unavailable. Report downloaded as backup file instead.`);
+      } catch (localError) {
+        console.error("Fallback storage failed:", localError);
+      }
+      
+      setTimeout(() => setStorageStatus(""), 3000);
+      return false;
+    } finally {
+      setUploadingToCloud(false);
+    }
+  };
+
+  // Email Functions
+  const sendReportViaEmail = async (reportData) => {
+  if (!emailForm.recipient || !emailForm.recipient.includes('@')) {
+    alert("Please enter a valid email address!");
+    return;
+  }
+
+  setSendingEmail(true);
+  setStorageStatus("📧 Sending email...");
+
+  try {
+    const token = getToken();
+    if (!token) {
+      alert("Authentication token missing. Please log in again.");
+      setSendingEmail(false);
+      return;
+    }
+
+    console.log("🔑 Token available, sending email request...");
+
+    // Prepare report content
+    const reportContent = generateStudentReportText(filteredStudents);
+    const csvContent = generateStudentCSV(filteredStudents);
+
+    // Send to backend email endpoint
+    const response = await fetchWithAuth("http://127.0.0.1:8000/api/accounts/send-report-email/", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        recipient: emailForm.recipient,
+        subject: emailForm.subject,
+        message: emailForm.message,
+        reportContent: reportContent,
+        csvContent: csvContent,
+        reportData: reportData || {
+          students: filteredStudents,
+          generatedAt: new Date().toISOString(),
+          summary: {
+            totalStudents: filteredStudents.length,
+            averageGPA: calculateAverageGPA(),
+            semester: selectedSemester,
+          }
+        }
+      }),
+    });
+
+    console.log("📧 Email API response status:", response.status);
+
+    if (response.ok) {
+      const result = await response.json();
+      setStorageStatus("✅ Email sent successfully!");
+      alert(`Report sent to ${emailForm.recipient} successfully!`);
+      setShowStorageModal(false);
+      setEmailForm({
+        recipient: "",
+        subject: "Student Performance Report",
+        message: "Please find attached the student performance report.",
+      });
+      setTimeout(() => setStorageStatus(""), 3000);
+      return true;
+    } else if (response.status === 401) {
+      alert("Authentication expired. Please refresh the page and log in again.");
+      return false;
+    } else {
+      const errorText = await response.text();
+      console.error("Email sending failed:", response.status, errorText);
+      alert(`Failed to send email: ${response.status}`);
+      return false;
+    }
+  } catch (error) {
+    console.error("Email sending error:", error);
+    setStorageStatus("❌ Email sending failed");
+    alert(`Failed to send email: ${error.message}`);
+    return false;
+  } finally {
+    setSendingEmail(false);
+  }
+};
+
+  // Handle storage action based on selected option
+  const handleStorageAction = async () => {
+  // Prepare report data
+  const reportData = generatedReportData || {
+    students: filteredStudents,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalStudents: filteredStudents.length,
+      averageGPA: calculateAverageGPA(),
+      semester: selectedSemester,
+      reportType: 'Student Performance Analysis'
+    }
+  };
+
+  if (storageOption === "cloud") {
+    // Now using Google Drive Personal Drive
+    await uploadToCloud(reportData, 'gdrive');
+  } else if (storageOption === "email") {
+    await sendReportViaEmail(reportData);
+  } else {
+    // Download option
+    const reportContent = JSON.stringify(reportData, null, 2);
+    const blob = new Blob([reportContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `student_report_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    setShowStorageModal(false);
+  }
+};
 
   // ========== REPORT GENERATION FUNCTIONS ==========
   const generateReport = async () => {
@@ -1086,7 +1300,7 @@ function AdminReportsPage() {
       }, {})
     }));
   };
-
+  
   const analyzeStudentProgression = (students) => {
     // This would require historical student data across multiple semesters
     // For now, provide basic analysis
@@ -1106,17 +1320,6 @@ function AdminReportsPage() {
       singleSemesterStudents: Object.keys(studentSemesters).length - multiSemesterStudents,
       analysis: `${multiSemesterStudents} students have records across multiple semesters`
     };
-  };
-
-  // ========== DOWNLOAD FUNCTIONS ==========
-  const downloadStudentReport = () => {
-    const csvContent = generateStudentCSV(filteredStudents);
-    downloadCSV(csvContent, `student_performance_report_${new Date().toISOString().split('T')[0]}.csv`);
-  };
-
-  const downloadPDF = () => {
-    const content = generateStudentReportText(filteredStudents);
-    downloadTextFile(content, `student_performance_report_${new Date().toISOString().split('T')[0]}.txt`);
   };
 
   const generateStudentCSV = (data) => {
@@ -1240,7 +1443,7 @@ function AdminReportsPage() {
             </button>
             
             <button 
-              className="btn btn-success btn-sm"
+              className="btn btn-success btn-sm me-2"
               onClick={() => {
                 const summary = `
 COMPREHENSIVE STUDENT PERFORMANCE REPORT
@@ -1270,6 +1473,15 @@ ${generatedReportData.compiledReport.recommendations.join('\n- ')}
               }}
             >
               📄 Download Summary (TXT)
+            </button>
+
+            <button 
+              className="btn btn-info btn-sm"
+              onClick={() => {
+                setShowStorageModal(true);
+              }}
+            >
+              📤 Share Report
             </button>
           </div>
         </div>
@@ -1479,11 +1691,33 @@ ${generatedReportData.compiledReport.recommendations.join('\n- ')}
               </div>
 
               <div className="d-flex gap-2">
-                <button className="btn btn-success" onClick={downloadStudentReport}>
+                <button 
+                  className="btn btn-success" 
+                  onClick={() => {
+                    const csvContent = generateStudentCSV(filteredStudents);
+                    downloadCSV(csvContent, `student_performance_report_${new Date().toISOString().split('T')[0]}.csv`);
+                  }}
+                >
                   📥 Download CSV
                 </button>
-                <button className="btn btn-primary" onClick={downloadPDF}>
-                  📄 Download Report
+                
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => {
+                    const content = generateStudentReportText(filteredStudents);
+                    downloadTextFile(content, `student_performance_report_${new Date().toISOString().split('T')[0]}.txt`);
+                  }}
+                >
+                  📄 Download TXT
+                </button>
+                
+                {/* New Share Button */}
+                <button 
+                  className="btn btn-info" 
+                  onClick={() => setShowStorageModal(true)}
+                  disabled={filteredStudents.length === 0}
+                >
+                  💾 Save & Share
                 </button>
               </div>
             </div>
@@ -1780,6 +2014,140 @@ ${generatedReportData.compiledReport.recommendations.join('\n- ')}
         {/* Generated Report Section */}
         <GeneratedReportSection />
       </div>
+
+      {/* Storage Options Modal */}
+      {showStorageModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">💾 Save & Share Report</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => setShowStorageModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                {/* Storage Status */}
+                {storageStatus && (
+                  <div className={`alert ${storageStatus.includes("✅") ? "alert-success" : storageStatus.includes("❌") ? "alert-danger" : "alert-info"} mb-3`}>
+                    {storageStatus}
+                  </div>
+                )}
+
+                {/* Storage Options */}
+                <div className="mb-4">
+                  <label className="form-label fw-bold">Choose Storage Option:</label>
+                  <div className="d-grid gap-2">
+                    <button
+                      className={`btn ${storageOption === "download" ? "btn-primary" : "btn-outline-primary"} text-start`}
+                      onClick={() => setStorageOption("download")}
+                    >
+                      📥 Download to Computer
+                      <small className="d-block text-muted">Save as JSON/CSV file on your device</small>
+                    </button>
+
+                    <button
+                      className={`btn ${storageOption === "cloud" ? "btn-success" : "btn-outline-success"} text-start`}
+                      onClick={() => setStorageOption("cloud")}
+                    >
+                      ☁️ Save to Cloud Storage
+                      <small className="d-block text-muted">Upload to Google Drive, Dropbox, or OneDrive</small>
+                    </button>
+
+                    <button
+                      className={`btn ${storageOption === "email" ? "btn-info" : "btn-outline-info"} text-start`}
+                      onClick={() => setStorageOption("email")}
+                    >
+                      📧 Email Report
+                      <small className="d-block text-muted">Send directly to email recipients</small>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cloud Provider Selection */}
+              
+                 {storageOption === "cloud" && (
+  <div className="mb-3">
+    <div className="alert alert-success">
+      <strong>☁️ Supabase Cloud Storage</strong>
+      <br />
+      Files will be uploaded to secure cloud storage with instant public URLs.
+      <br />
+      <small>Fast, reliable, and no storage limits for your reports.</small>
+    </div>
+  </div>
+)}
+
+                {/* Email Form */}
+                {storageOption === "email" && (
+                  <div className="mb-3">
+                    <label className="form-label">Recipient Email:</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      placeholder="recipient@example.com"
+                      value={emailForm.recipient}
+                      onChange={(e) => setEmailForm({...emailForm, recipient: e.target.value})}
+                    />
+                    
+                    <label className="form-label mt-2">Subject:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={emailForm.subject}
+                      onChange={(e) => setEmailForm({...emailForm, subject: e.target.value})}
+                    />
+                    
+                    <label className="form-label mt-2">Message:</label>
+                    <textarea
+                      className="form-control"
+                      rows="3"
+                      value={emailForm.message}
+                      onChange={(e) => setEmailForm({...emailForm, message: e.target.value})}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowStorageModal(false)}
+                  disabled={uploadingToCloud || sendingEmail}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleStorageAction}
+                  disabled={uploadingToCloud || sendingEmail || (storageOption === "email" && !emailForm.recipient)}
+                >
+                  {uploadingToCloud ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Uploading...
+                    </>
+                  ) : sendingEmail ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Sending...
+                    </>
+                  ) : storageOption === "download" ? (
+                    "📥 Download Now"
+                  ) : storageOption === "cloud" ? (
+                    `☁️ Upload to ${cloudProvider === 'gdrive' ? 'Google Drive' : cloudProvider === 'dropbox' ? 'Dropbox' : 'OneDrive'}`
+                  ) : (
+                    "📧 Send Email"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

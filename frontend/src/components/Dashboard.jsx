@@ -32,6 +32,119 @@ const computeCGPA = (semesters) => {
   return (totalPoints / totalCredits).toFixed(2);
 };
 
+// API Service Functions
+const apiService = {
+  // Get authentication token
+  getAuthHeaders: () => {
+    const token = localStorage.getItem("accessToken");
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  },
+
+  // Handle API response
+  handleResponse: async (response) => {
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    return await response.json();
+  },
+
+  // Fetch dashboard statistics
+  fetchDashboardStats: async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/accounts/dashboard-stats/", {
+        headers: apiService.getAuthHeaders(),
+      });
+      return await apiService.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      // Return mock data if API is not available
+      return {
+        total_users: 45,
+        total_courses: 12,
+        total_reports: 23,
+        active_students: 127,
+        recent_users: [
+          { id: 1, username: "john_doe", role: "student", created_at: "2024-01-15" },
+          { id: 2, username: "jane_smith", role: "lecturer", created_at: "2024-01-14" },
+          { id: 3, username: "admin_user", role: "admin", created_at: "2024-01-13" }
+        ]
+      };
+    }
+  },
+
+  // Fetch all users
+  fetchUsers: async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/accounts/users/", {
+        headers: apiService.getAuthHeaders(),
+      });
+      return await apiService.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      return [];
+    }
+  },
+
+  // Fetch all courses
+  fetchCourses: async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/accounts/courses/", {
+        headers: apiService.getAuthHeaders(),
+      });
+      return await apiService.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      return [];
+    }
+  },
+
+  // Fetch reports
+  fetchReports: async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/accounts/reports/", {
+        headers: apiService.getAuthHeaders(),
+      });
+      return await apiService.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      return [];
+    }
+  },
+
+  // Add new user
+  addUser: async (userData) => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/accounts/users/", {
+        method: "POST",
+        headers: apiService.getAuthHeaders(),
+        body: JSON.stringify(userData),
+      });
+      return await apiService.handleResponse(response);
+    } catch (error) {
+      console.error("Error adding user:", error);
+      throw error;
+    }
+  },
+
+  // Add new course
+  addCourse: async (courseData) => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/accounts/courses/", {
+        method: "POST",
+        headers: apiService.getAuthHeaders(),
+        body: JSON.stringify(courseData),
+      });
+      return await apiService.handleResponse(response);
+    } catch (error) {
+      console.error("Error adding course:", error);
+      throw error;
+    }
+  }
+};
+
 // Overview Content Component for Student Dashboard
 const OverviewContent = ({ user, achievements, skills, projects, awards }) => {
   return (
@@ -87,7 +200,6 @@ const OverviewContent = ({ user, achievements, skills, projects, awards }) => {
   );
 };
 
-// Student Dashboard Component with Tabs
 // Student Dashboard Component with Tabs
 const StudentDashboard = ({ user, achievements, setActivePage }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -162,6 +274,368 @@ const StudentDashboard = ({ user, achievements, setActivePage }) => {
   );
 };
 
+// Admin Dashboard Component with Real Data
+const AdminDashboard = ({ 
+  user, 
+  dashboardStats,
+  recentUsers,
+  onShowUserModal,
+  onRefreshData 
+}) => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(false);
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    await onRefreshData();
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      {/* Enhanced Welcome Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-4"
+      >
+        <div className="card shadow border-0 bg-dark text-white">
+          <div className="card-body py-4">
+            <div className="row align-items-center">
+              <div className="col-md-8">
+                <h3 className="mb-2">⚙️ Hello, {user.username}!</h3>
+                <p className="mb-0 opacity-75">
+                  Welcome to your admin dashboard. Manage users, courses, and monitor system performance.
+                </p>
+              </div>
+              <div className="col-md-4 text-end">
+                <div className="bg-white bg-opacity-20 rounded p-3 d-inline-block">
+                  <small className="d-block opacity-75">Your Role</small>
+                  <strong className="fs-5">{user.role.toUpperCase()}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Navigation Tabs */}
+      <div className="card shadow-sm mb-4">
+        <div className="card-body py-3">
+          <div className="d-flex justify-content-between align-items-center">
+            <ul className="nav nav-tabs border-0">
+              <li className="nav-item">
+                <button className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`} 
+                        onClick={() => setActiveTab('overview')}>
+                  📊 Dashboard
+                </button>
+              </li>
+              <li className="nav-item">
+                <button className={`nav-link ${activeTab === 'users' ? 'active' : ''}`} 
+                        onClick={() => setActiveTab('users')}>
+                  👥 Manage Users
+                </button>
+              </li>
+              <li className="nav-item">
+                <button className={`nav-link ${activeTab === 'reports' ? 'active' : ''}`} 
+                        onClick={() => setActiveTab('reports')}>
+                  📈 Reports
+                </button>
+              </li>
+            </ul>
+            <button 
+              className="btn btn-outline-primary btn-sm" 
+              onClick={handleRefresh}
+              disabled={loading}
+            >
+              {loading ? '🔄 Refreshing...' : '🔄 Refresh Data'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <div>
+          {/* Responsive Stats Cards */}
+          <div className="row mb-4">
+            <div className="col-xl-3 col-md-6 mb-3">
+              <DashboardCard 
+                title="Total Registered Users" 
+                value={dashboardStats.total_users} 
+                icon="👥" 
+                color="#caffbf" 
+              />
+            </div>
+            <div className="col-xl-3 col-md-6 mb-3">
+              <DashboardCard 
+                title="Courses Registered" 
+                value={dashboardStats.total_courses} 
+                icon="📚" 
+                color="#9bf6ff" 
+              />
+            </div>
+            <div className="col-xl-3 col-md-6 mb-3">
+              <DashboardCard 
+                title="Reports Generated" 
+                value={dashboardStats.total_reports} 
+                icon="📊" 
+                color="#ffd6a5" 
+              />
+            </div>
+            <div className="col-xl-3 col-md-6 mb-3">
+              <DashboardCard 
+                title="Active Students" 
+                value={dashboardStats.active_students} 
+                icon="🎓" 
+                color="#ffadad" 
+              />
+            </div>
+          </div>
+
+          {/* Recent Activity Section */}
+          <motion.div 
+            className="card shadow mb-4 p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h5 className="mb-3">📈 System Overview</h5>
+            <div className="row">
+              <div className="col-md-6 mb-3">
+                <h6>Recent User Registrations</h6>
+                <ul className="list-group">
+                  {recentUsers.slice(0, 5).map((user, index) => (
+                    <li key={user.id || index} className="list-group-item d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>{user.username}</strong>
+                        <small className="d-block text-muted">{user.role}</small>
+                      </div>
+                      <span className="badge bg-primary">{new Date(user.created_at).toLocaleDateString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="col-md-6">
+                <h6>Quick Actions</h6>
+                <div className="d-grid gap-2">
+                  <button className="btn btn-outline-primary btn-sm" onClick={onShowUserModal}>
+                    👥 Add New User
+                  </button>
+                  <button className="btn btn-outline-info btn-sm" onClick={() => setActiveTab('reports')}>
+                    📊 Generate Report
+                  </button>
+                  <button className="btn btn-outline-success btn-sm" onClick={() => setActiveTab('users')}>
+                    🔧 Manage Users
+                  </button>
+                </div>
+                <div className="mt-3 p-3 bg-light rounded">
+                  <small className="text-muted">
+                    <strong>Last Updated:</strong> {new Date().toLocaleString()}
+                  </small>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <Leaderboard currentUser={user} />
+        </div>
+      )}
+
+      {activeTab === 'users' && (
+        <AdminUsersTab onShowUserModal={onShowUserModal} />
+      )}
+
+      {activeTab === 'reports' && (
+        <AdminReportsTab />
+      )}
+    </div>
+  );
+};
+
+// Admin Users Tab Component
+const AdminUsersTab = ({ onShowUserModal }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const usersData = await apiService.fetchUsers();
+        setUsers(usersData);
+      } catch (error) {
+        console.error("Error loading users:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsers();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="text-center p-4">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading users...</span>
+        </div>
+        <p className="mt-2">Loading users...</p>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div 
+      className="card shadow mb-4 p-4"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h5 className="mb-0">👥 Manage Users</h5>
+        <button className="btn btn-success" onClick={onShowUserModal}>
+          ➕ Add User
+        </button>
+      </div>
+      <div className="table-responsive">
+        <table className="table table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td>{user.id}</td>
+                <td>
+                  <strong>{user.username}</strong>
+                </td>
+                <td>{user.email}</td>
+                <td>
+                  <span className={`badge ${
+                    user.role === 'admin' ? 'bg-danger' : 
+                    user.role === 'lecturer' ? 'bg-warning' : 'bg-primary'
+                  }`}>
+                    {user.role}
+                  </span>
+                </td>
+                <td>
+                  <span className="badge bg-success">Active</span>
+                </td>
+                <td>
+                  <button className="btn btn-sm btn-outline-primary me-1">
+                    Edit
+                  </button>
+                  <button className="btn btn-sm btn-outline-danger">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
+  );
+};
+
+// Admin Reports Tab Component
+const AdminReportsTab = () => {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadReports = async () => {
+      try {
+        const reportsData = await apiService.fetchReports();
+        setReports(reportsData);
+      } catch (error) {
+        console.error("Error loading reports:", error);
+        // Mock data for demonstration
+        setReports([
+          { id: 1, title: "Student Performance Report - Q1", type: "performance", date: "2024-01-15" },
+          { id: 2, title: "Course Completion Rate - 2025", type: "course", date: "2024-01-14" },
+          { id: 3, title: "System Usage Statistics - March", type: "system", date: "2024-01-13" },
+          { id: 4, title: "User Activity Report - Weekly", type: "user", date: "2024-01-12" }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReports();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="text-center p-4">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading reports...</span>
+        </div>
+        <p className="mt-2">Loading reports...</p>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div 
+      className="card shadow mb-4 p-4"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <h5 className="mb-3">📊 System Reports</h5>
+      <div className="table-responsive">
+        <table className="table table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Report Title</th>
+              <th>Type</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reports.map((report) => (
+              <tr key={report.id}>
+                <td>{report.id}</td>
+                <td>
+                  <strong>{report.title}</strong>
+                </td>
+                <td>
+                  <span className={`badge ${
+                    report.type === 'performance' ? 'bg-success' : 
+                    report.type === 'course' ? 'bg-info' : 
+                    report.type === 'system' ? 'bg-warning' : 'bg-primary'
+                  }`}>
+                    {report.type}
+                  </span>
+                </td>
+                <td>{new Date(report.date).toLocaleDateString()}</td>
+                <td>
+                  <button className="btn btn-sm btn-outline-primary me-1">
+                    View
+                  </button>
+                  <button className="btn btn-sm btn-outline-success me-1">
+                    Download
+                  </button>
+                  <button className="btn btn-sm btn-outline-danger">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
+  );
+};
+
 function Dashboard() {
   const navigate = useNavigate();
   
@@ -178,18 +652,16 @@ function Dashboard() {
 
   const [newCourse, setNewCourse] = useState("");
   const [newAssignment, setNewAssignment] = useState("");
-  const [newUser, setNewUser] = useState("");
+  const [newUser, setNewUser] = useState({
+    username: "",
+    email: "",
+    password: "",
+    role: "student"
+  });
 
-  const [courses, setCourses] = useState(["Web Development", "React JS"]);
-  const [assignments, setAssignments] = useState([
-    "JavaScript Challenge",
-    "Node.js Basics",
-  ]);
-  const [users, setUsers] = useState([
-    "John Doe (Student)",
-    "Jane Smith (Lecturer)",
-    "Admin: Mr. Paul",
-  ]);
+  const [courses, setCourses] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [users, setUsers] = useState([]);
 
   const [skills, setSkills] = useState(["React JS", "UI Design"]);
   const [projects, setProjects] = useState(["Portfolio Website"]);
@@ -206,26 +678,46 @@ function Dashboard() {
   ]);
   const [newAchievement, setNewAchievement] = useState("");
 
-  const [studentGrades, setStudentGrades] = useState({
-    "student1": {
-      semesters: [
-        {
-          name: "Semester 1, 2025",
-          courses: [
-            { name: "Mathematics", grade: 4.0, credits: 3 },
-            { name: "Physics", grade: 3.7, credits: 3 },
-          ],
-        },
-        {
-          name: "Semester 2, 2025",
-          courses: [
-            { name: "Chemistry", grade: 3.3, credits: 3 },
-            { name: "Biology", grade: 3.8, credits: 3 },
-          ],
-        },
-      ],
-    },
+  // Real-time dashboard stats
+  const [dashboardStats, setDashboardStats] = useState({
+    total_users: 0,
+    total_courses: 0,
+    total_reports: 0,
+    active_students: 0
   });
+
+  const [recentUsers, setRecentUsers] = useState([]);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // Fetch real dashboard data from API
+  const fetchDashboardData = async () => {
+    setDataLoading(true);
+    try {
+      const stats = await apiService.fetchDashboardStats();
+      setDashboardStats(stats);
+      setRecentUsers(stats.recent_users || []);
+      
+      // Fetch additional data
+      const [usersData, coursesData] = await Promise.all([
+        apiService.fetchUsers(),
+        apiService.fetchCourses()
+      ]);
+      
+      setUsers(usersData);
+      setCourses(coursesData);
+      
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   const refreshAccessToken = async () => {
     const refreshToken = localStorage.getItem("refreshToken");
@@ -431,11 +923,19 @@ function Dashboard() {
     setShowUpload(false);
   };
 
-  const handleAddCourse = () => {
+  const handleAddCourse = async () => {
     if (newCourse.trim()) {
-      setCourses([...courses, newCourse]);
-      setNewCourse("");
-      setShowCourseModal(false);
+      try {
+        const courseData = { name: newCourse.trim() };
+        await apiService.addCourse(courseData);
+        setCourses([...courses, courseData]);
+        setNewCourse("");
+        setShowCourseModal(false);
+        // Refresh dashboard data
+        await fetchDashboardData();
+      } catch (error) {
+        alert("Failed to add course. Please try again.");
+      }
     }
   };
 
@@ -447,11 +947,19 @@ function Dashboard() {
     }
   };
 
-  const handleAddUser = () => {
-    if (newUser.trim()) {
-      setUsers([...users, newUser]);
-      setNewUser("");
-      setShowUserModal(false);
+  const handleAddUser = async () => {
+    if (newUser.username.trim() && newUser.email.trim() && newUser.password.trim()) {
+      try {
+        await apiService.addUser(newUser);
+        setNewUser({ username: "", email: "", password: "", role: "student" });
+        setShowUserModal(false);
+        // Refresh dashboard data
+        await fetchDashboardData();
+      } catch (error) {
+        alert("Failed to add user. Please try again.");
+      }
+    } else {
+      alert("Please fill in all required fields.");
     }
   };
 
@@ -478,20 +986,18 @@ function Dashboard() {
   };
 
   const handleLogout = () => {
-
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("user");
-  localStorage.removeItem("token");
-  localStorage.removeItem("userData");
-  
-  console.log("✅ Logout successful, redirecting to login...");
-  
-
-  setTimeout(() => {
-    navigate("/login", { replace: true });
-  }, 100);
-};
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("userData");
+    
+    console.log("✅ Logout successful, redirecting to login...");
+    
+    setTimeout(() => {
+      navigate("/login", { replace: true });
+    }, 100);
+  };
 
   // ==================== RENDER CONTENT BASED ON ACTIVE PAGE ====================
   const renderContent = () => {
@@ -533,6 +1039,19 @@ function Dashboard() {
       );
     }
 
+    if (user.role === "admin") {
+      return (
+        <AdminDashboard 
+          user={user}
+          dashboardStats={dashboardStats}
+          recentUsers={recentUsers}
+          onShowUserModal={() => setShowUserModal(true)}
+          onRefreshData={fetchDashboardData}
+        />
+      );
+    }
+
+    // Lecturer Dashboard (existing code)
     return (
       <>
         <motion.div
@@ -546,56 +1065,35 @@ function Dashboard() {
           </p>
         </motion.div>
 
-        {/* ================= LECTURER DASHBOARD ================= */}
-        {user.role === "lecturer" && (
-          <>
-            <div className="row mb-4">
-              <DashboardCard title="Courses" value={courses.length} icon="📚" color="#caffbf" />
-              <DashboardCard title="Assignments" value={assignments.length} icon="📋" color="#9bf6ff" />
-              <DashboardCard title="Students" value="127" icon="👥" color="#ffd6a5" />
-            </div>
+        {/* Responsive Cards for Lecturer */}
+        <div className="row mb-4">
+          <div className="col-xl-3 col-md-6 mb-3">
+            <DashboardCard title="Courses" value={courses.length} icon="📚" color="#caffbf" />
+          </div>
+          <div className="col-xl-3 col-md-6 mb-3">
+            <DashboardCard title="Assignments" value={assignments.length} icon="📋" color="#9bf6ff" />
+          </div>
+          <div className="col-xl-3 col-md-6 mb-3">
+            <DashboardCard title="Students" value="127" icon="👥" color="#ffd6a5" />
+          </div>
+          <div className="col-xl-3 col-md-6 mb-3">
+            <DashboardCard title="Pending Grading" value="8" icon="📝" color="#ffadad" />
+          </div>
+        </div>
 
-            <DashboardSection 
-              title="📚 Manage Courses" 
-              items={courses} 
-              buttonText="➕ Add Course" 
-              onClick={() => setShowCourseModal(true)} 
-            />
-            <DashboardSection 
-              title="📋 Manage Assignments" 
-              items={assignments} 
-              buttonText="➕ Add Assignment" 
-              onClick={() => setShowAssignmentModal(true)} 
-            />
-            <Leaderboard currentUser={user} />
-          </>
-        )}
-
-        {/* ================= ADMIN DASHBOARD ================= */}
-        {user.role === "admin" && (
-          <>
-            <div className="row mb-4">
-              <DashboardCard title="Total Users" value={users.length} icon="👥" color="#caffbf" />
-              <DashboardCard title="Active Courses" value={courses.length} icon="📚" color="#9bf6ff" />
-              <DashboardCard title="Reports" value="12" icon="📊" color="#ffd6a5" />
-            </div>
-
-            <DashboardSection 
-              title="👥 Manage Users" 
-              items={users} 
-              buttonText="➕ Add User" 
-              onClick={() => setShowUserModal(true)} 
-            />
-            <DashboardSection 
-              title="📊 Reports" 
-              items={[
-                "Student Performance Report - Q1", 
-                "Course Completion Rate - 2025"
-              ]} 
-            />
-            <Leaderboard currentUser={user} />
-          </>
-        )}
+        <DashboardSection 
+          title="📚 Manage Courses" 
+          items={courses.map(c => c.name || c)} 
+          buttonText="➕ Add Course" 
+          onClick={() => setShowCourseModal(true)} 
+        />
+        <DashboardSection 
+          title="📋 Manage Assignments" 
+          items={assignments} 
+          buttonText="➕ Add Assignment" 
+          onClick={() => setShowAssignmentModal(true)} 
+        />
+        <Leaderboard currentUser={user} />
       </>
     );
   };
@@ -650,6 +1148,12 @@ function Dashboard() {
           marginTop: user.role === "student" ? "1500px" : "500px"
         }}
       >
+        {dataLoading && (
+          <div className="alert alert-info d-flex align-items-center">
+            <div className="spinner-border spinner-border-sm me-2" role="status"></div>
+            Loading real-time data...
+          </div>
+        )}
         {renderContent()}
       </div>
 
@@ -672,7 +1176,9 @@ function Dashboard() {
             onChange={(e) => setNewCourse(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddCourse()}
           />
-          <button className="btn btn-success w-100" onClick={handleAddCourse}>Add Course</button>
+          <button className="btn btn-success w-100" onClick={handleAddCourse}>
+            Add Course
+          </button>
         </Modal>
       )}
 
@@ -686,21 +1192,59 @@ function Dashboard() {
             onChange={(e) => setNewAssignment(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddAssignment()}
           />
-          <button className="btn btn-primary w-100" onClick={handleAddAssignment}>Add Assignment</button>
+          <button className="btn btn-primary w-100" onClick={handleAddAssignment}>
+            Add Assignment
+          </button>
         </Modal>
       )}
 
       {showUserModal && (
         <Modal title="Add New User" onClose={() => setShowUserModal(false)}>
-          <input 
-            type="text" 
-            className="form-control mb-3" 
-            placeholder="Enter user name and role" 
-            value={newUser} 
-            onChange={(e) => setNewUser(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddUser()}
-          />
-          <button className="btn btn-success w-100" onClick={handleAddUser}>Add User</button>
+          <div className="mb-3">
+            <label className="form-label">Username</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              placeholder="Enter username" 
+              value={newUser.username} 
+              onChange={(e) => setNewUser({...newUser, username: e.target.value})}
+            />
+          </div>
+          <div className="mb-3">
+            <label className="form-label">Email</label>
+            <input 
+              type="email" 
+              className="form-control" 
+              placeholder="Enter email" 
+              value={newUser.email} 
+              onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+            />
+          </div>
+          <div className="mb-3">
+            <label className="form-label">Password</label>
+            <input 
+              type="password" 
+              className="form-control" 
+              placeholder="Enter password" 
+              value={newUser.password} 
+              onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+            />
+          </div>
+          <div className="mb-3">
+            <label className="form-label">Role</label>
+            <select 
+              className="form-control" 
+              value={newUser.role} 
+              onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+            >
+              <option value="student">Student</option>
+              <option value="lecturer">Lecturer</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button className="btn btn-success w-100" onClick={handleAddUser}>
+            Add User
+          </button>
         </Modal>
       )}
     </div>
@@ -709,9 +1253,9 @@ function Dashboard() {
 
 // ==================== REUSABLE COMPONENTS ====================
 const DashboardCard = ({ title, value, icon, color }) => (
-  <div className="col-md-3 mb-3">
+  <div className="col-12">
     <motion.div 
-      className="card shadow text-center p-4 border-0" 
+      className="card shadow text-center p-4 border-0 h-100" 
       style={{ backgroundColor: color }} 
       initial={{ opacity: 0, scale: 0.9 }} 
       animate={{ opacity: 1, scale: 1 }}
@@ -735,7 +1279,7 @@ const DashboardSection = ({ title, items, buttonText, onClick }) => (
     <ul className="list-group mb-3">
       {items.map((item, idx) => (
         <li key={idx} className="list-group-item d-flex justify-content-between align-items-center">
-          {item}
+          {typeof item === 'object' ? item.name || item.title : item}
           <span className="badge bg-primary rounded-pill">{idx + 1}</span>
         </li>
       ))}

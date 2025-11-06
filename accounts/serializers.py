@@ -1,9 +1,42 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
 from .models import GPARecord
-
+from .models import Course, Report
 
 User = get_user_model()
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'role', 'date_joined']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
+    
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        user = User.objects.create(**validated_data)
+        if password:
+            user.set_password(password)
+            user.save()
+        return user
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = ['id', 'name', 'code', 'description', 'created_at']
+
+class ReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Report
+        fields = ['id', 'title', 'type', 'content', 'created_at', 'created_by']
+
+class DashboardStatsSerializer(serializers.Serializer):
+    total_users = serializers.IntegerField()
+    total_courses = serializers.IntegerField()
+    total_reports = serializers.IntegerField()
+    active_students = serializers.IntegerField()
+
 
 class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)

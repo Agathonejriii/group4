@@ -15,6 +15,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-fallback-key-for-dev-only')
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'  # Default True for dev
 
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend' 
+
 # --- Hosts ---
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 ALLOWED_HOSTS = [RENDER_EXTERNAL_HOSTNAME] if RENDER_EXTERNAL_HOSTNAME else []
@@ -35,6 +37,7 @@ INSTALLED_APPS = [
     'sslserver',       # For local HTTPS dev
     'accounts',
     'students',
+    'reports',
 ]
 
 
@@ -156,6 +159,28 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+
+# settings.py
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'agathonek@gmail.com'  # Replace with your actual Gmail
+EMAIL_HOST_PASSWORD = 'olvt netq zfzm adep'  # Replace with the 16-char app password
+DEFAULT_FROM_EMAIL = 'agathonek@gmail.com'  # Same as EMAIL_HOST_USER
+SERVER_EMAIL = 'agathonek@gmail.com'  # Same as EMAIL_HOST_USER
+
+SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://flqnqellfwgfahkztucn.supabase.co')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZscW5xZWxsZndnZmFoa3p0dWNuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjI4NzgxNSwiZXhwIjoyMDc3ODYzODE1fQ.7zS3oZmOyxdp1tw7BrztGeUoC9FzAzpxuxUf6DMEgyI')
+# Cloud Storage Configuration (optional - for Google Drive, Dropbox, etc.)
+GOOGLE_DRIVE_CLIENT_ID = 'your-client-id'
+GOOGLE_DRIVE_CLIENT_SECRET = 'your-client-secret'
+DROPBOX_ACCESS_TOKEN = 'your-dropbox-token'
+ONEDRIVE_CLIENT_ID = 'your-onedrive-client-id'
+
+
 
 # --- Media Files ---
 MEDIA_URL = '/media/'
