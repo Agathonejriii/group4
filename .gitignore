@@ -34,3 +34,27 @@ Thumbs.db
 # !requirements.txt
 # !render.yaml
 # !build.sh
+
+# Secrets and credentials
+credentials.json
+*.json
+*.key
+*.pem
+*.p12
+service-account*.json
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
